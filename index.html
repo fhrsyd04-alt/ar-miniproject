@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AR Poster Hidup</title>
+</head>
+<body>
+  <h1>Halo AR!</h1>
+  <p id="status">Memeriksa kamera...</p>
+
+  <script>
+    const status = document.getElementById("status");
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(() => { status.textContent = "Kamera berhasil diizinkan"; })
+      .catch(() => { status.textContent = "Izin kamera ditolak atau tidak tersedia"; });
+  </script>
+</body>
+</html>
