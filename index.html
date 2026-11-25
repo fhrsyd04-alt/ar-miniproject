@@ -3,17 +3,78 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AR Poster Hidup</title>
+  <title>Kartu Belajar AR: Tata Surya</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #container { position: fixed; inset: 0; }
+    #status {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      padding: 8px 16px; border-radius: 20px; z-index: 10;
+      background: rgba(0, 0, 0, 0.65); color: #fff; font: 16px sans-serif;
+      text-align: center; max-width: 90%;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+    }
+  }
+  </script>
 </head>
 <body>
-  <h1>Halo AR!</h1>
-  <p id="status">Memeriksa kamera...</p>
+  <div id="status">Memuat...</div>
+  <div id="container"></div>
 
-  <script>
-    const status = document.getElementById("status");
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(() => { status.textContent = "Kamera berhasil diizinkan"; })
-      .catch(() => { status.textContent = "Izin kamera ditolak atau tidak tersedia"; });
+  <script type="module">
+    import * as THREE from "three";
+    import { MindARThree } from "mindar-image-three";
+
+    const statusEl = document.getElementById("status");
+
+    const mindarThree = new MindARThree({
+      container: document.getElementById("container"),
+      imageTargetSrc: "./targets.mind",
+      uiLoading: "no",
+      uiScanning: "no"
+    });
+    const { renderer, scene, camera } = mindarThree;
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
+
+    const daftarKartu = [
+      { nama: "Bumi", warna: 0x1e88e5 },
+      { nama: "Mars", warna: 0xd84315 },
+      { nama: "Jupiter", warna: 0xef6c00 },
+      { nama: "Saturnus", warna: 0xc6a700 }
+    ];
+
+    const kubus = daftarKartu.map((kartu, i) => {
+      const anchor = mindarThree.addAnchor(i);
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.5, 0.5),
+        new THREE.MeshStandardMaterial({ color: kartu.warna })
+      );
+      cube.position.z = 0.25;
+      anchor.group.add(cube);
+      anchor.onTargetFound = () => { statusEl.textContent = "Kartu " + kartu.nama + " ditemukan"; };
+      anchor.onTargetLost = () => { statusEl.textContent = "Mencari kartu..."; };
+      return cube;
+    });
+
+    try {
+      await mindarThree.start();
+      statusEl.textContent = "Mencari kartu...";
+      renderer.setAnimationLoop(() => {
+        kubus.forEach((c) => { c.rotation.y += 0.02; });
+        renderer.render(scene, camera);
+      });
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Kamera tidak bisa diakses. Izinkan kamera lalu muat ulang halaman.";
+    }
   </script>
 </body>
 </html>
