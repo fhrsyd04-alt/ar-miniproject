@@ -1,20 +1,40 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kartu Belajar AR: Tata Surya</title>
-  <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-    #container { position: fixed; inset: 0; }
-    #status {
-      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-      padding: 8px 16px; border-radius: 20px; z-index: 10;
-      background: rgba(0, 0, 0, 0.65); color: #fff; font: 16px sans-serif;
-      text-align: center; max-width: 90%;
-    }
-  </style>
-  <script type="importmap">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kartu Belajar AR: Tata Surya</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #container {
+            position: fixed;
+            inset: 0;
+        }
+
+        #status {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 16px;
+            border-radius: 20px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.65);
+            color: #fff;
+            font: 16px sans-serif;
+            text-align: center;
+            max-width: 90%;
+        }
+    </style>
+    <script type="importmap">
   {
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -24,57 +44,80 @@
   }
   </script>
 </head>
+
 <body>
-  <div id="status">Memuat...</div>
-  <div id="container"></div>
+    <div id="status">Memuat...</div>
+    <div id="container"></div>
 
-  <script type="module">
-    import * as THREE from "three";
-    import { MindARThree } from "mindar-image-three";
+    <script type="module">
+        import * as THREE from "three";
+        import { MindARThree } from "mindar-image-three";
+        import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-    const statusEl = document.getElementById("status");
+        const statusEl = document.getElementById("status");
 
-    const mindarThree = new MindARThree({
-      container: document.getElementById("container"),
-      imageTargetSrc: "./targets.mind",
-      uiLoading: "no",
-      uiScanning: "no"
-    });
-    const { renderer, scene, camera } = mindarThree;
+        const mindarThree = new MindARThree({
+            container: document.getElementById("container"),
+            imageTargetSrc: "./targets.mind",
+            uiLoading: "no",
+            uiScanning: "no"
+        });
+        const { renderer, scene, camera } = mindarThree;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
 
-    const daftarKartu = [
-      { nama: "Bumi", warna: 0x1e88e5 },
-      { nama: "Mars", warna: 0xd84315 },
-      { nama: "Jupiter", warna: 0xef6c00 },
-      { nama: "Saturnus", warna: 0xc6a700 }
-    ];
+        const daftarKartu = [
+            { nama: "Bumi", file: "./models/bumi.glb" },
+            { nama: "Mars", file: "./models/mars.glb" },
+            { nama: "Jupiter", file: "./models/jupiter.glb" },
+            { nama: "Saturnus", file: "./models/saturnus.glb" }
+        ];
 
-    const kubus = daftarKartu.map((kartu, i) => {
-      const anchor = mindarThree.addAnchor(i);
-      const cube = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 0.5, 0.5),
-        new THREE.MeshStandardMaterial({ color: kartu.warna })
-      );
-      cube.position.z = 0.25;
-      anchor.group.add(cube);
-      anchor.onTargetFound = () => { statusEl.textContent = "Kartu " + kartu.nama + " ditemukan"; };
-      anchor.onTargetLost = () => { statusEl.textContent = "Mencari kartu..."; };
-      return cube;
-    });
+        const loader = new GLTFLoader();
+        const clock = new THREE.Clock();
+        const mixers = [];
+        const planet = [];
 
-    try {
-      await mindarThree.start();
-      statusEl.textContent = "Mencari kartu...";
-      renderer.setAnimationLoop(() => {
-        kubus.forEach((c) => { c.rotation.y += 0.02; });
-        renderer.render(scene, camera);
-      });
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent = "Kamera tidak bisa diakses. Izinkan kamera lalu muat ulang halaman.";
-    }
-  </script>
+        daftarKartu.forEach((kartu, i) => {
+            const anchor = mindarThree.addAnchor(i);
+
+            loader.load(
+                kartu.file,
+                (gltf) => {
+                    const model = gltf.scene;
+                    model.scale.set(0.5, 0.5, 0.5);
+                    model.position.z = 0.25;
+                    anchor.group.add(model);
+                    planet.push(model);
+
+                    if (gltf.animations.length > 0) {
+                        const mixer = new THREE.AnimationMixer(model);
+                        mixer.clipAction(gltf.animations[0]).play();
+                        mixers.push(mixer);
+                    }
+                },
+                undefined,
+                (err) => console.error("Gagal memuat " + kartu.file, err)
+            );
+
+            anchor.onTargetFound = () => { statusEl.textContent = "Kartu " + kartu.nama + " ditemukan"; };
+            anchor.onTargetLost = () => { statusEl.textContent = "Mencari kartu..."; };
+        });
+
+        try {
+            await mindarThree.start();
+            statusEl.textContent = "Mencari kartu...";
+            renderer.setAnimationLoop(() => {
+                const delta = clock.getDelta();
+                mixers.forEach((m) => m.update(delta));
+                planet.forEach((p) => { p.rotation.y += 0.02; });
+                renderer.render(scene, camera);
+            });
+        } catch (err) {
+            console.error(err);
+            statusEl.textContent = "Kamera tidak bisa diakses. Izinkan kamera lalu muat ulang halaman.";
+        }
+    </script>
 </body>
+
 </html>
